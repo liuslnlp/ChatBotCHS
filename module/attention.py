@@ -12,7 +12,7 @@ class BaseAttention(nn.Module):
     def forward(self, query, key_val):
         """
         query: shape=(batch_size, hidden_dim)
-        key_val: .shape=(max_seq_len, batch_size, hidden_dim)
+        key_val: shape=(max_seq_len, batch_size, hidden_dim)
         """
         # scores.shape=(batch_size, max_seq_len)
         scores = self.attn(query, key_val)

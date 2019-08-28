@@ -30,9 +30,10 @@ def get_args():
     return parser.parse_args()
 
 
-def train_encode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_func, args):
+def train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_func, args):
     use_teacher_forcing = True if random.random() < args.tf_radio else False
     loss = 0
+    
     for t in range(args.max_seq_len):
         decoder_output, decoder_hidden = decoder(
                 decoder_input, decoder_hidden, encoder_outputs
@@ -40,8 +41,10 @@ def train_encode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, t
         if use_teacher_forcing:
             decoder_input = targets[t].view(1, -1)
         else:
-            _, topi = decoder_output.topk(1)
-            decoder_input = torch.LongTensor([[topi[i][0] for i in range(args.batch_size)]])
+            _, topi = decoder_output.topk(1) 
+            decoder_input = topi[:decoder_input.shape[1], 0].unsqueeze(0)
+            # decoder_input = torch.LongTensor([[topi[i][0] for i in range(decoder_input.shape[1])]])
+            # print(decoder_input.shape) #1,64 64
             decoder_input = decoder_input.to(next(decoder.parameters()).device)
         loss += loss_func(decoder_output, targets[t])
     return loss
@@ -49,15 +52,13 @@ def train_encode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, t
 def save_model(encoder, decoder, dir:str):
     output_dir = Path(dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(encoder.state_dict(), 'encoder.pkl')
-    torch.save(decoder.state_dict(), 'decoder.pkl')
+    torch.save(encoder.state_dict(), output_dir / 'encoder.pkl')
+    torch.save(decoder.state_dict(), output_dir / 'decoder.pkl')
 
 
 def main():
     args = get_args()
     input_dir = Path(args.input_dir)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(__name__)
     target_pad = 0
     loss_fct = nn.NLLLoss(ignore_index=target_pad)
@@ -89,10 +90,11 @@ def main():
             decoder_optimizer.zero_grad()
 
             input_ids, targets, lens = tuple(t.t().to(device) for t in batch)
-            decoder_input = torch.full((args.batch_size, ), word_dict['[SOS]'], dtype=torch.long).unsqueeze(0).to(device)
+            true_batch_size = input_ids.shape[1]
+            decoder_input = torch.full((true_batch_size, ), word_dict['[SOS]'], dtype=torch.long).unsqueeze(0).to(device)
             encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_hidden = encoder_hidden[:decoder.n_layers]
-            loss = train_encode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)
+            loss = train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)
             loss.backward()
             encoder_optimizer.step()
             decoder_optimizer.step()
@@ -100,7 +102,7 @@ def main():
             if step % args.print_step == 0:
                 logger.info(
                     f"[epoch]: {epoch}, [batch]: {step}, [loss]: {loss.item():.6}")
-    save_model(encoder, decoder, args.outout_dir)
+    save_model(encoder, decoder, args.output_dir)
 
 if __name__ == "__main__":
     main()

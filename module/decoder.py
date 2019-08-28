@@ -29,7 +29,7 @@ class GRUDecoder(nn.Module):
         # hidden.shape=(n_layers * num_directions, batch_size, hidden_size)
         output, hidden = self.gru(embedded, last_hidden)
         # scores.shape=(batch_size, 1, max_seq_len)
-        scores = self.attn(output.squeeze(), encoder_outputs)
+        scores = self.attn(output.squeeze(0), encoder_outputs)
         # context.shape=(batch_size, 1, hidden_dim)
         context = scores.bmm(encoder_outputs.transpose(0, 1))
         # context.shape=(batch_size, hidden_dim)
@@ -54,7 +54,7 @@ class GreedySearchDecoder(nn.Module):
         self.sos_flag = sos_flag
 
     def forward(self, input_seq, input_length, max_length):
-        device = self.encoder.device
+        device = next(self.encoder.parameters()).device
         # Forward input through encoder model
         encoder_outputs, encoder_hidden = self.encoder(input_seq, input_length)
         # Prepare encoder's final hidden layer to be first hidden input to the decoder
