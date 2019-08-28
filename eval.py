@@ -7,6 +7,7 @@ from util import load_word_dict
 
 
 def evaluate(encoder, searcher, word_to_ix, ix_to_word, sentence, device, max_seq_len):
+    searcher.to(device)
     encoder.eval()
     searcher.eval()
     input_ids = [word_to_ix.get(word, word_to_ix['[UNK]']) for word in sentence]
@@ -25,7 +26,7 @@ def load_model(encoder, decoder, dir:str):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", default='data', type=str)
+    parser.add_argument("--vocab_dir", default='data', type=str)
     parser.add_argument("--output_dir", default='output', type=str)
     parser.add_argument("--max_seq_len", type=int, default=32)
     parser.add_argument("--embed_dim", type=int, default=128)
@@ -39,7 +40,7 @@ def get_args():
 
 def main():
     args = get_args()
-    word_to_ix = load_word_dict(Path(args.input_dir))
+    word_to_ix = load_word_dict(Path(args.vocab_dir))
     vocab = len(word_to_ix)
     ix_to_word = {v:k for k, v in word_to_ix.items()}
     embedding = nn.Embedding(vocab, args.embed_dim, padding_idx=word_to_ix['[PAD]'])
