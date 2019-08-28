@@ -83,7 +83,7 @@ def main():
     parser.add_argument("--output_dir", default='data', type=str)
     parser.add_argument("--max_seq_len", default=32, type=int)
     args = parser.parse_args()
-    pairs = load_raw_data(args.path)[:1000]
+    pairs = load_raw_data(args.path)
     word_to_ix = create_word_to_ix(pairs)
     print(f"Vocab size: {len(word_to_ix)}")
     queries, replies, lens = create_train_dataset(pairs, word_to_ix, args.max_seq_len)
