@@ -46,7 +46,10 @@ def train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, t
             # decoder_input = torch.LongTensor([[topi[i][0] for i in range(decoder_input.shape[1])]])
             # print(decoder_input.shape) #1,64 64
             decoder_input = decoder_input.to(next(decoder.parameters()).device)
-        loss += loss_func(decoder_output, targets[t])
+        # decoder_output.shape=(batch_size, target_dim) 
+        # targets[t].shape=(batch_size) 
+        #print(decoder_output.shape, targets[t].shape)
+        loss += loss_func(decoder_output, targets[t]) 
     return loss
 
 def save_model(encoder, decoder, dir:str):
@@ -58,14 +61,13 @@ def save_model(encoder, decoder, dir:str):
 
 def main():
     args = get_args()
-    input_dir = Path(args.input_dir)
     logger = logging.getLogger(__name__)
-    target_pad = 0
-    loss_fct = nn.NLLLoss(ignore_index=target_pad)
-    # loss_fct(logits.view(-1, self.model.tag_size), tag_ids.view(-1))
 
+    input_dir = Path(args.input_dir)
     queries, replies, lens = load_dataset(input_dir)
     word_dict = load_word_dict(input_dir)
+
+    
     trainset = TensorDataset(queries, replies, lens)
     trainloader = DataLoader(
         trainset, batch_size=args.batch_size, shuffle=True)
@@ -77,12 +79,15 @@ def main():
     decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab)
     device = torch.device('cuda' if torch.cuda.is_available()
                           and not args.no_cuda else 'cpu')
+
     for model in (encoder, decoder):
         model.train()
         model.to(device)
+
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.lr)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.lr)
-    # print(args.max_seq_len)
+    loss_fct = nn.NLLLoss(ignore_index=word_dict['[PAD]'])
+
     for epoch in range(args.epochs):
         logger.info(f"***** Epoch {epoch} *****")
         for step, batch in enumerate(trainloader):
@@ -91,7 +96,7 @@ def main():
 
             input_ids, targets, lens = tuple(t.t().to(device) for t in batch)
             true_batch_size = input_ids.shape[1]
-            decoder_input = torch.full((true_batch_size, ), word_dict['[SOS]'], dtype=torch.long).unsqueeze(0).to(device)
+            decoder_input = torch.full((1, true_batch_size), word_dict['[SOS]'], dtype=torch.long, device=device)
             encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_hidden = encoder_hidden[:decoder.n_layers]
             loss = train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)

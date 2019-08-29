@@ -1,2 +1,2 @@
-# ChatBoxCHS
-中文聊天机器人
+# ChatBotCHS
+Under developing...

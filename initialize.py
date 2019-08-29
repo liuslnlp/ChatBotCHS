@@ -3,7 +3,7 @@ import argparse
 import torch
 from pathlib import Path
 import logging
-from util import save_dataset, save_word_dict
+from util import save_dataset, save_word_dict, convert_tokens_to_ids
 
 def load_raw_data(path: str):
     path = Path(path)
@@ -42,8 +42,7 @@ def load_raw_data(path: str):
         
     return datas
 
-def convert_tokens_to_ids(tokens: List[str], word_to_ix: Dict[str, int])->List[int]:
-    return [word_to_ix.get(token, word_to_ix['[UNK]']) for token in tokens]
+
 
 def tokenize(text: str)->List[str]:
     return text.lower().split()
@@ -64,15 +63,15 @@ def create_train_dataset(datas, word_to_ix, max_seq_len):
     replies = torch.full((total, max_seq_len), word_to_ix['[PAD]'], dtype=torch.long)
     lens = torch.zeros((total, 2), dtype=torch.long)
     for i, (query, reply) in enumerate(datas):
-        fix_len = min(max_seq_len, len(query))
+        fix_len = min(max_seq_len - 1, len(query))
         query = torch.tensor(convert_tokens_to_ids(query[:fix_len], word_to_ix))
-        queries[i, :fix_len] = query
-        lens[i, 0] = fix_len
+        queries[i, :fix_len + 1] = query
+        lens[i, 0] = fix_len + 1
 
-        fix_len = min(max_seq_len, len(reply))
+        fix_len = min(max_seq_len - 1, len(reply))
         reply = torch.tensor(convert_tokens_to_ids(reply[:fix_len], word_to_ix))
-        replies[i, :fix_len] = reply
-        lens[i, 1] = fix_len
+        replies[i, :fix_len + 1] = reply
+        lens[i, 1] = fix_len + 1
 
     return queries, replies, lens
 
@@ -92,8 +91,6 @@ def main():
 
     save_word_dict(word_to_ix, output_dir)
     save_dataset(queries, replies, lens, output_dir)
-
-
 
 
 if __name__ == "__main__":
