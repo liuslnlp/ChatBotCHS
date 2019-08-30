@@ -108,7 +108,6 @@ def main():
             if step % args.print_step == 0:
                 logger.info(
                     f"[epoch]: {epoch}, [batch]: {step}, [loss]: {loss.item():.6}")
-    torch.save(embedding.state_dict(), Path(args.output_dir) / 'embedding.pkl')
     save_model(encoder, decoder, args.output_dir)
 
 if __name__ == "__main__":
