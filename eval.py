@@ -27,13 +27,13 @@ def evaluate_loop(searcher, word_to_ix, max_seq_len):
         output_tokens = evaluate(searcher, word_to_ix,
                                  ix_to_word, input_sentence, max_seq_len)
         output_tokens = [x for x in output_tokens if not (
-            x == 'EOS' or x == 'PAD')]
+            x == '[EOS]' or x == '[PAD]')]      
         print('Bot:', ''.join(output_tokens))
 
 
 def load_model(encoder, decoder, dir: str):
     output_dir = Path(dir)
-    encoder.load_state_dict(torch.load(output_dir / 'encoder.pkl'))
+    encoder.load_state_dict(torch.load(output_dir / 'encoder.pkl'))    
     decoder.load_state_dict(torch.load(output_dir / 'decoder.pkl'))
 
 
@@ -42,6 +42,7 @@ def get_args():
     parser.add_argument("--vocab_dir", default='data', type=str)
     parser.add_argument("--output_dir", default='output', type=str)
     parser.add_argument("--max_seq_len", type=int, default=32)
+    parser.add_argument("--n_layer", type=int, default=2)
     parser.add_argument("--embed_dim", type=int, default=128)
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--tf_radio", type=float,
@@ -63,6 +64,7 @@ def main():
     encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer)
     attn = DotAttention(args.hidden_dim)
     decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab, args.n_layer)
+    load_model(encoder, decoder, args.output_dir)
     searcher = GreedySearchDecoder(encoder, decoder, word_to_ix['[SOS]'])
     device = torch.device('cuda' if torch.cuda.is_available()
                           and not args.no_cuda else 'cpu')

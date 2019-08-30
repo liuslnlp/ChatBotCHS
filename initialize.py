@@ -4,11 +4,12 @@ import torch
 from pathlib import Path
 import logging
 from util import save_dataset, save_word_dict, convert_tokens_to_ids
+from collections import defaultdict
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-def load_raw_data(path: str):
+def load_raw_data(path: str) -> List[Tuple[str, str]]:
     path = Path(path)
     with path.open(encoding='utf-8') as f:
         raw_datas = f.readlines()
@@ -16,7 +17,7 @@ def load_raw_data(path: str):
     query_buf = []
     reply_buf = []
     flag = 0
-    for idx, line in enumerate(raw_datas):
+    for line in raw_datas:
         line = line.strip()
 
         if line == 'E' and query_buf:
@@ -50,17 +51,23 @@ def tokenize(text: str) -> List[str]:
     return text.lower().split()
 
 
-def create_word_to_ix(tokens: List[Tuple[str, str]]):
+def create_word_to_ix(tokens: List[Tuple[str, str]], max_vocab_size: int):
     word_to_ix = {'[PAD]': 0, '[SOS]': 1, '[EOS]': 2, '[UNK]': 3}
+    max_vocab_size -= 4
+    freq_dict = defaultdict(int)
     for pair in tokens:
         for sent in pair:
             for token in sent:
-                if token not in word_to_ix:
-                    word_to_ix[token] = len(word_to_ix)
+                freq_dict[token] += 1
+    sorted_items = sorted(freq_dict.items(), key=lambda t: t[1], reverse=True)[
+        :max_vocab_size]
+    for word, _ in sorted_items:
+        if word not in word_to_ix:
+            word_to_ix[word] = len(word_to_ix)
     return word_to_ix
 
 
-def create_train_dataset(datas, word_to_ix, max_seq_len):
+def create_train_dataset(datas: List[Tuple[str, str]], word_to_ix: Dict[str, int], max_seq_len: int):
     total = len(datas)
     queries = torch.full((total, max_seq_len),
                          word_to_ix['[PAD]'], dtype=torch.long)
@@ -90,12 +97,14 @@ def main():
         "--path", default='dataset/xiaohuangji50w_nofenci.conv', type=str)
     parser.add_argument("--output_dir", default='data', type=str)
     parser.add_argument("--max_seq_len", default=32, type=int)
+    parser.add_argument("--max_vocab_size", default=6500, type=int)
+
     args = parser.parse_args()
     logger.info("Loading raw data...")
     pairs = load_raw_data(args.path)
 
     logger.info("Building word dict...")
-    word_to_ix = create_word_to_ix(pairs)
+    word_to_ix = create_word_to_ix(pairs, args.max_vocab_size)
     logger.info(f"Vocab size: {len(word_to_ix)}")
 
     logger.info("Building tensor-format dataset...")

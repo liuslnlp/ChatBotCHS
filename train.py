@@ -16,14 +16,14 @@ def get_args():
     parser.add_argument("--input_dir", default='data', type=str)
     parser.add_argument("--output_dir", default='output', type=str)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--max_seq_len", type=int, default=32)
     parser.add_argument("--embed_dim", type=int, default=128)
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--n_layer", type=int, default=2)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--print_step", type=int, default=20)
-    parser.add_argument("--tf_radio", type=float, default=0.5, help='teacher_forcing_ratio')
+    parser.add_argument("--tf_radio", type=float, default=0.8, help='teacher_forcing_ratio')
 
     parser.add_argument("--no_cuda",
                         action='store_true',
@@ -75,9 +75,9 @@ def main():
 
     vocab = len(word_dict)
     embedding = nn.Embedding(vocab, args.embed_dim, padding_idx=word_dict['[PAD]'])
-    encoder = GRUEncoder(embedding, args.hidden_dim)
+    encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer)
     attn = DotAttention(args.hidden_dim)
-    decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab)
+    decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab, args.n_layer)
     device = torch.device('cuda' if torch.cuda.is_available()
                           and not args.no_cuda else 'cpu')
 
