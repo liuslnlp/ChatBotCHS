@@ -60,9 +60,9 @@ def main():
 
     embedding = nn.Embedding(vocab, args.embed_dim,
                              padding_idx=word_to_ix['[PAD]'])
-    encoder = GRUEncoder(embedding, args.hidden_dim)
+    encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer)
     attn = DotAttention(args.hidden_dim)
-    decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab)
+    decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab, args.n_layer)
     searcher = GreedySearchDecoder(encoder, decoder, word_to_ix['[SOS]'])
     device = torch.device('cuda' if torch.cuda.is_available()
                           and not args.no_cuda else 'cpu')

@@ -20,6 +20,7 @@ def get_args():
     parser.add_argument("--max_seq_len", type=int, default=32)
     parser.add_argument("--embed_dim", type=int, default=128)
     parser.add_argument("--hidden_dim", type=int, default=256)
+    parser.add_argument("--n_layer", type=int, default=2)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--print_step", type=int, default=20)
     parser.add_argument("--tf_radio", type=float, default=0.5, help='teacher_forcing_ratio')
@@ -107,6 +108,7 @@ def main():
             if step % args.print_step == 0:
                 logger.info(
                     f"[epoch]: {epoch}, [batch]: {step}, [loss]: {loss.item():.6}")
+    torch.save(embedding.state_dict(), Path(args.output_dir) / 'embedding.pkl')
     save_model(encoder, decoder, args.output_dir)
 
 if __name__ == "__main__":
