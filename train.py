@@ -22,6 +22,7 @@ def get_args():
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--n_layer", type=int, default=2)
     parser.add_argument("--lr", type=float, default=0.001)
+    parser.add_argument("--clip", type=float, default=50)
     parser.add_argument("--print_step", type=int, default=20)
     parser.add_argument("--tf_radio", type=float, default=0.8, help='teacher_forcing_ratio')
 
@@ -59,6 +60,15 @@ def save_model(encoder, decoder, dir:str):
     torch.save(encoder.state_dict(), output_dir / 'encoder.pkl')
     torch.save(decoder.state_dict(), output_dir / 'decoder.pkl')
 
+def gen_decoder_head(num, sos, device):
+    return torch.full((1, num), sos, dtype=torch.long, device=device)
+
+
+def nll(inp, target, ignore=0):
+    crossEntropy = -torch.log(torch.gather(inp, 1, target.view(-1, 1)).squeeze(1))
+    ind = target != ignore
+    loss = crossEntropy.masked_select(ind.squeeze()).mean()
+    return loss 
 
 def main():
     args = get_args()
@@ -87,7 +97,7 @@ def main():
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.lr)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.lr)
-    loss_fct = nn.NLLLoss(ignore_index=word_dict['[PAD]'])
+    loss_fct = nn.CrossEntropyLoss(ignore_index=word_dict['[PAD]'])
 
     for epoch in range(args.epochs):
         logger.info(f"***** Epoch {epoch} *****")
@@ -96,12 +106,16 @@ def main():
             decoder_optimizer.zero_grad()
 
             input_ids, targets, lens = tuple(t.t().to(device) for t in batch)
-            true_batch_size = input_ids.shape[1]
-            decoder_input = torch.full((1, true_batch_size), word_dict['[SOS]'], dtype=torch.long, device=device)
+            cur_batch_size = input_ids.shape[1]
+            decoder_input = gen_decoder_head(cur_batch_size, word_dict['[SOS]'], device)
             encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_hidden = encoder_hidden[:decoder.n_layers]
             loss = train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)
             loss.backward()
+
+            nn.utils.clip_grad_norm_(encoder.parameters(), args.clip)
+            nn.utils.clip_grad_norm_(decoder.parameters(), args.clip)
+
             encoder_optimizer.step()
             decoder_optimizer.step()
 

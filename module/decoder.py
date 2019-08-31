@@ -42,7 +42,7 @@ class GRUDecoder(nn.Module):
         output = torch.tanh(self.concat(concat))
         # output.shape=(batch_size, output_dim)
         output = self.linear(output)
-        output = F.log_softmax(output, dim=1)
+        # output = F.softmax(output, dim=1)
         # Return output and final hidden state
         return output, hidden
 

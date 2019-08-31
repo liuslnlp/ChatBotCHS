@@ -28,7 +28,8 @@ def evaluate_loop(searcher, word_to_ix, max_seq_len):
                                  ix_to_word, input_sentence, max_seq_len)
         output_tokens = [x for x in output_tokens if not (
             x == '[EOS]' or x == '[PAD]')]      
-        print('Bot:', ''.join(output_tokens))
+        # print('Bot:', ''.join(output_tokens))
+        print('Bot:', output_tokens)
 
 
 def load_model(encoder, decoder, dir: str):
