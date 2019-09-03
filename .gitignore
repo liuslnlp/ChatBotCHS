@@ -6,10 +6,11 @@ __pycache__/
 # C extensions
 *.so
 dataset
-data 
+data
+data2
+data3
 output
 demo.py
-data2
 # Distribution / packaging
 .Python
 build/

@@ -11,31 +11,15 @@ from module import GRUEncoder, GRUDecoder, DotAttention
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", default='data', type=str)
-    parser.add_argument("--output_dir", default='output', type=str)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--max_seq_len", type=int, default=32)
-    parser.add_argument("--embed_dim", type=int, default=128)
-    parser.add_argument("--hidden_dim", type=int, default=256)
-    parser.add_argument("--n_layer", type=int, default=2)
-    parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--clip", type=float, default=50)
-    parser.add_argument("--print_step", type=int, default=20)
-    parser.add_argument("--tf_radio", type=float, default=0.8, help='teacher_forcing_ratio')
 
-    parser.add_argument("--no_cuda",
-                        action='store_true',
-                        help="Whether not to use CUDA when available")
-    return parser.parse_args()
 
 
 def train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_func, args):
+    """
+    targets: shape=(max_seq_len, batch_size)
+    """
     use_teacher_forcing = True if random.random() < args.tf_radio else False
     loss = 0
-    
     for t in range(args.max_seq_len):
         decoder_output, decoder_hidden = decoder(
                 decoder_input, decoder_hidden, encoder_outputs
@@ -54,9 +38,10 @@ def train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, t
         loss += loss_func(decoder_output, targets[t]) 
     return loss
 
-def save_model(encoder, decoder, dir:str):
+def save_model(embedding, encoder, decoder, dir:str):
     output_dir = Path(dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(embedding.state_dict(), output_dir / 'embedding.pkl')
     torch.save(encoder.state_dict(), output_dir / 'encoder.pkl')
     torch.save(decoder.state_dict(), output_dir / 'decoder.pkl')
 
@@ -69,6 +54,32 @@ def nll(inp, target, ignore=0):
     ind = target != ignore
     loss = crossEntropy.masked_select(ind.squeeze()).mean()
     return loss 
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", default='data', type=str)
+    parser.add_argument("--output_dir", default='output', type=str)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--max_seq_len", type=int, default=32)
+    parser.add_argument("--embed_dim", type=int, default=500)
+    parser.add_argument("--hidden_dim", type=int, default=500)
+    parser.add_argument("--n_layer", type=int, default=2)
+    parser.add_argument("--encoder_lr", type=float, default=0.0001)
+    parser.add_argument("--decoder_lr", type=float, default=0.0005)    
+    parser.add_argument("--clip", type=float, default=50)
+    parser.add_argument("--dropout", type=float, default=0.1)
+
+    parser.add_argument("--print_step", type=int, default=20)
+    parser.add_argument("--tf_radio", type=float, default=0.95, help='teacher_forcing_ratio')
+
+    parser.add_argument("--no_cuda",
+                        action='store_true',
+                        help="Whether not to use CUDA when available")
+    return parser.parse_args()
+
+def train_one_step():
+    pass
 
 def main():
     args = get_args()
@@ -85,9 +96,8 @@ def main():
 
     vocab = len(word_dict)
     embedding = nn.Embedding(vocab, args.embed_dim, padding_idx=word_dict['[PAD]'])
-    encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer)
-    attn = DotAttention(args.hidden_dim)
-    decoder = GRUDecoder(embedding, attn, args.hidden_dim, vocab, args.n_layer)
+    encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer, args.dropout)
+    decoder = GRUDecoder(embedding, args.hidden_dim, vocab, args.n_layer, args.dropout)
     device = torch.device('cuda' if torch.cuda.is_available()
                           and not args.no_cuda else 'cpu')
 
@@ -95,11 +105,12 @@ def main():
         model.train()
         model.to(device)
 
-    encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.lr)
-    decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.lr)
+    encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.encoder_lr)
+    decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.decoder_lr)
     loss_fct = nn.CrossEntropyLoss(ignore_index=word_dict['[PAD]'])
 
     for epoch in range(args.epochs):
+        loss_cache = []
         logger.info(f"***** Epoch {epoch} *****")
         for step, batch in enumerate(trainloader):
             encoder_optimizer.zero_grad()
@@ -111,6 +122,7 @@ def main():
             encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_hidden = encoder_hidden[:decoder.n_layers]
             loss = train_decode_step(decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)
+            loss_cache.append(loss.item())
             loss.backward()
 
             nn.utils.clip_grad_norm_(encoder.parameters(), args.clip)
@@ -120,9 +132,11 @@ def main():
             decoder_optimizer.step()
 
             if step % args.print_step == 0:
+                ave_loss = torch.FloatTensor(loss_cache).mean()
+                loss_cache.clear()
                 logger.info(
-                    f"[epoch]: {epoch}, [batch]: {step}, [loss]: {loss.item():.6}")
-    save_model(encoder, decoder, args.output_dir)
+                    f"[epoch]: {epoch}, [batch]: {step}, [loss]: {ave_loss.item():.6}")
+    save_model(embedding, encoder, decoder, args.output_dir)
 
 if __name__ == "__main__":
     main()

@@ -76,18 +76,17 @@ def create_train_dataset(datas: List[Tuple[List[str], List[str]]], word_to_ix: D
                          word_to_ix['[PAD]'], dtype=torch.long)
     lens = torch.zeros((total, 2), dtype=torch.long)
     for i, (query, reply) in enumerate(datas):
-        fix_len = min(max_seq_len - 1, len(query))
-        query = torch.tensor(convert_tokens_to_ids(
-            query[:fix_len], word_to_ix))
-        queries[i, :fix_len + 1] = query
-        lens[i, 0] = fix_len + 1
+        query = convert_tokens_to_ids(query[:max_seq_len - 1], word_to_ix)
+        query = torch.tensor(query)
+        fix_len = query.shape[0]
+        queries[i, :fix_len] = query
+        lens[i, 0] = fix_len
 
-        fix_len = min(max_seq_len - 1, len(reply))
-        reply = torch.tensor(convert_tokens_to_ids(
-            reply[:fix_len], word_to_ix))
-        replies[i, :fix_len + 1] = reply
-        lens[i, 1] = fix_len + 1
-
+        reply = convert_tokens_to_ids(reply[:max_seq_len - 1], word_to_ix)
+        reply = torch.tensor(reply)
+        fix_len = reply.shape[0]
+        replies[i, :fix_len] = reply
+        lens[i, 1] = fix_len
     return queries, replies, lens
 
 
@@ -108,15 +107,19 @@ def main():
     logger.info("Loading raw data and extracting sentence pairs...")
     lines = load_lines(lines_filename)
     conversations = load_conversations(conversations_filename)
-    pairs = extract_sentence_pairs(conversations, lines)
+    pairs = extract_sentence_pairs(conversations, lines)[:100]
+
 
     logger.info("Building word dict...")
     word_to_ix = create_word_to_ix(pairs, args.max_vocab_size)
+
+ 
     logger.info(f"Vocab size: {len(word_to_ix)}")
 
     logger.info("Building tensor-format dataset...")
     queries, replies, lens = create_train_dataset(
         pairs, word_to_ix, args.max_seq_len)
+
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

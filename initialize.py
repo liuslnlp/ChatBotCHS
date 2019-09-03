@@ -106,6 +106,7 @@ def main():
     logger.info("Building word dict...")
     word_to_ix = create_word_to_ix(pairs, args.max_vocab_size)
     logger.info(f"Vocab size: {len(word_to_ix)}")
+    
 
     logger.info("Building tensor-format dataset...")
     queries, replies, lens = create_train_dataset(

@@ -1,18 +1,20 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+from .attention import DotAttention
 
 
 class GRUDecoder(nn.Module):
-    def __init__(self, embedding, attn, hidden_dim, output_dim, n_layers=1, dropout=0.1):
+    def __init__(self, embedding, hidden_dim, output_dim, n_layers=1, dropout=0.1):
         super().__init__()
         self.embedding = embedding
         embedding_dim = embedding.weight.data.shape[1]
-        self.attn = attn
+        self.embedding_dropout = nn.Dropout(dropout)
+        self.attn = DotAttention(hidden_dim)
         self.n_layers = n_layers
         self.gru = nn.GRU(embedding_dim, hidden_dim, n_layers,
                           dropout=(0 if n_layers == 1 else dropout))
-        self.embedding_dropout = nn.Dropout(dropout)
+        
         self.concat = nn.Linear(hidden_dim * 2, hidden_dim)
         self.linear = nn.Linear(hidden_dim, output_dim)
     
@@ -72,7 +74,7 @@ class GreedySearchDecoder(nn.Module):
             # Forward pass through decoder
             decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
             # Obtain most likely word token and its softmax score
-            decoder_scores, decoder_input = torch.max(decoder_output, dim=1)
+            decoder_scores, decoder_input = torch.max(decoder_output.softmax(dim=-1), dim=1)
             # Record token and score
             all_tokens.append(decoder_input)
             all_scores.append(decoder_scores)
