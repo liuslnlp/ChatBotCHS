@@ -19,7 +19,6 @@ def evaluate(searcher, word_to_ix, ix_to_word, sentence, max_seq_len):
     lengths = torch.tensor(lengths).unsqueeze(0).to(device)
     with torch.no_grad():
         tokens, scores = searcher(input_ids, lengths, max_seq_len)
-    print(scores)
     decoded_words = [ix_to_word[token.item()] for token in tokens]
     return decoded_words
 
@@ -63,8 +62,6 @@ def main():
     args = get_args()
     word_to_ix = load_word_dict(Path(args.vocab_dir))
     vocab = len(word_to_ix)
-
-    word_to_ix.update({'[PAD]': 0, '[SOS]': 1, '[EOS]': 2, '[UNK]': vocab})
 
 
 

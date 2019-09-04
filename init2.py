@@ -53,13 +53,13 @@ def tokenize(s):
     s = re.sub(r"\s+", r" ", s).strip()
     return s.split()
 
-def create_word_to_ix(tokens: List[Tuple[List[str], List[str]]], max_vocab_size: int):
+def create_word_to_ix(tokens: List[Tuple[List[str], List[str]]], max_seq_len:int, max_vocab_size: int):
     word_to_ix = {'[PAD]': 0, '[SOS]': 1, '[EOS]': 2, '[UNK]': 3}
     max_vocab_size -= 4
     freq_dict = defaultdict(int)
     for pair in tokens:
         for sent in pair:
-            for token in sent:
+            for token in sent[:max_seq_len]:
                 freq_dict[token] += 1
     sorted_items = sorted(freq_dict.items(), key=lambda t: t[1], reverse=True)[
         :max_vocab_size]
@@ -67,6 +67,8 @@ def create_word_to_ix(tokens: List[Tuple[List[str], List[str]]], max_vocab_size:
         if word not in word_to_ix:
             word_to_ix[word] = len(word_to_ix)
     return word_to_ix
+
+
 
 def create_train_dataset(datas: List[Tuple[List[str], List[str]]], word_to_ix: Dict[str, int], max_seq_len: int):
     total = len(datas)
@@ -95,8 +97,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", default='dataset', type=str)
     parser.add_argument("--output_dir", default='data', type=str)
-    parser.add_argument("--max_seq_len", default=32, type=int)
-    parser.add_argument("--max_vocab_size", default=40000, type=int)
+    parser.add_argument("--max_seq_len", default=10, type=int)
+    parser.add_argument("--max_vocab_size", default=8000, type=int)
     args = parser.parse_args()
 
     path = Path(args.input_dir)
@@ -107,11 +109,11 @@ def main():
     logger.info("Loading raw data and extracting sentence pairs...")
     lines = load_lines(lines_filename)
     conversations = load_conversations(conversations_filename)
-    pairs = extract_sentence_pairs(conversations, lines)[:100]
+    pairs = extract_sentence_pairs(conversations, lines)
 
 
     logger.info("Building word dict...")
-    word_to_ix = create_word_to_ix(pairs, args.max_vocab_size)
+    word_to_ix = create_word_to_ix(pairs, args.max_seq_len, args.max_vocab_size)
 
  
     logger.info(f"Vocab size: {len(word_to_ix)}")
