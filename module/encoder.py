@@ -28,7 +28,7 @@ class GRUEncoder(nn.Module):
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs)
         # Sum bidirectional GRU outputs
         outputs = outputs[:, :, :self.hidden_dim] + \
-            outputs[:, :, self.hidden_dim:]
+                  outputs[:, :, self.hidden_dim:]
         # Return output and final hidden state
 
         # output.shape=(max_length, batch_size, hidden_size)
