@@ -24,6 +24,7 @@ def evaluate(searcher, word_to_ix, ix_to_word, sentence, max_seq_len, en: bool):
 
 def evaluate_loop(searcher, word_to_ix, max_seq_len, en: bool):
     ix_to_word = {idx: word for word, idx in word_to_ix.items()}
+    sep = ' ' if en else ''
     while True:
         input_sentence = input('> ')
         if input_sentence in ('q', 'quit'):
@@ -32,7 +33,8 @@ def evaluate_loop(searcher, word_to_ix, max_seq_len, en: bool):
                                  ix_to_word, input_sentence, max_seq_len, en)
         output_tokens = [x for x in output_tokens if not (
                 x == '[EOS]' or x == '[PAD]')]
-        print('Bot:', ''.join(output_tokens))
+        
+        print('Bot:', sep.join(output_tokens))
 
 
 def load_model(encoder, decoder, dir: str):
@@ -43,8 +45,8 @@ def load_model(encoder, decoder, dir: str):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--vocab_dir", default='data', type=str)
-    parser.add_argument("--ckpt_dir", default='output', type=str)
+    parser.add_argument("-v", "--vocab_dir", default='data', type=str)
+    parser.add_argument("-c", "--ckpt_dir", default='output', type=str)
     parser.add_argument("--max_seq_len", type=int, default=10)
     parser.add_argument("--n_layer", type=int, default=2)
     parser.add_argument("--embed_dim", type=int, default=500)

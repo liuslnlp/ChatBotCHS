@@ -45,9 +45,9 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input_dir", default='data', type=str)
     parser.add_argument("-o", "--output_dir", default='output', type=str)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--max_seq_len", type=int, default=10)
+    parser.add_argument("-b", "--batch_size", type=int, default=64)
+    parser.add_argument("-e", "--epochs", type=int, default=5)
+    parser.add_argument("-m", "--max_seq_len", type=int, default=10)
     parser.add_argument("--embed_dim", type=int, default=500)
     parser.add_argument("--hidden_dim", type=int, default=500)
     parser.add_argument("--n_layer", type=int, default=2)
@@ -58,7 +58,7 @@ def get_args():
 
     parser.add_argument("--print_step", type=int, default=20)
     parser.add_argument("--tf_radio", type=float,
-                        default=0.97, help='teacher_forcing_ratio')
+                        default=0.97, help='Teacher forcing ratio')
 
     parser.add_argument("--no_cuda",
                         action='store_true',
@@ -71,6 +71,7 @@ def main():
     logger = logging.getLogger(__name__)
 
     input_dir = Path(args.input_dir)
+    logger.info("Loading train data...")
     queries, replies, lens = load_dataset(input_dir)
     word_dict = load_word_dict(input_dir)
 
@@ -86,7 +87,7 @@ def main():
     decoder = AttnGRUDecoder(embedding, args.hidden_dim,
                              vocab, args.n_layer, args.dropout)
     device = torch.device('cuda' if torch.cuda.is_available()
-                                    and not args.no_cuda else 'cpu')
+                          and not args.no_cuda else 'cpu')
 
     for model in (encoder, decoder):
         model.train()
@@ -95,6 +96,17 @@ def main():
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.encoder_lr)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.decoder_lr)
     loss_fct = nn.CrossEntropyLoss(ignore_index=word_dict['[PAD]'])
+
+    logger.info("Training...")
+    logger.info(
+        f"[Epochs]: {args.epochs}, [Batch Size]: {args.batch_size}, [Max Len]: {args.max_seq_len}")
+    logger.info(f"[No CUDA]: {args.no_cuda}")
+    logger.info(
+        f"[Encoder LR]: {args.encoder_lr}, [Dncoder LR]: {args.decoder_lr}")
+    logger.info(
+        f"[Embedding Dim]: {args.embed_dim}, [Hidden Dim]: {args.hidden_dim}, [Num Layers]: {args.n_layer}")
+    logger.info(
+        f"[Dropout Prob]: {args.dropout}, [Teacher Forcing Radio]: {args.tf_radio}, [Clip]: {args.clip}")
 
     for epoch in range(args.epochs):
         loss_cache = []
@@ -105,9 +117,10 @@ def main():
 
             input_ids, targets, lens = tuple(t.t().to(device) for t in batch)
             cur_batch_size = input_ids.shape[1]
+            
+            encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_input = gen_decoder_head(
                 cur_batch_size, word_dict['[SOS]'], device)
-            encoder_outputs, encoder_hidden = encoder(input_ids, lens[0])
             decoder_hidden = encoder_hidden[:decoder.n_layers]
             loss = train_decode_step(
                 decoder, decoder_input, decoder_hidden, encoder_outputs, targets, loss_fct, args)
@@ -124,7 +137,7 @@ def main():
                 ave_loss = torch.FloatTensor(loss_cache).mean()
                 loss_cache.clear()
                 logger.info(
-                    f"[epoch]: {epoch}, [batch]: {step}, [Average loss]: {ave_loss.item():.6}")
+                    f"[epoch]: {epoch}, [batch]: {step}, [average loss]: {ave_loss.item():.6}")
     save_model(encoder, decoder, args.output_dir)
 
 

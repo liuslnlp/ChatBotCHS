@@ -41,13 +41,13 @@ def load_raw_data(path: str) -> List[Tuple[List[str], List[str]]]:
 
     query = ','.join(query_buf).replace(' ', '')
     reply = ','.join(reply_buf).replace(' ', '')
-    datas.append((list(query), list(reply)))
+    datas.append((tokenize(query), tokenize(reply)))
 
     return datas
 
 
 def tokenize(text: str) -> List[str]:
-    return text.lower().split()
+    return list(text.lower())
 
 
 def main():
