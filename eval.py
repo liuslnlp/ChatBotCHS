@@ -19,7 +19,7 @@ def evaluate(searcher, word_to_ix, ix_to_word, sentence, max_seq_len, en: bool):
     with torch.no_grad():
         tokens, scores = searcher(input_ids, lengths, max_seq_len)
     decoded_words = [ix_to_word[token.item()] for token in tokens]
-    return decoded_words
+    return decoded_words, scores
 
 
 def evaluate_loop(searcher, word_to_ix, max_seq_len, en: bool):
@@ -29,18 +29,20 @@ def evaluate_loop(searcher, word_to_ix, max_seq_len, en: bool):
         input_sentence = input('> ')
         if input_sentence in ('q', 'quit'):
             break
-        output_tokens = evaluate(searcher, word_to_ix,
-                                 ix_to_word, input_sentence, max_seq_len, en)
+        output_tokens, _ = evaluate(searcher, word_to_ix,
+                                    ix_to_word, input_sentence, max_seq_len, en)
         output_tokens = [x for x in output_tokens if not (
-                x == '[EOS]' or x == '[PAD]')]
-        
+            x == '[EOS]' or x == '[PAD]')]
+
         print('Bot:', sep.join(output_tokens))
 
 
-def load_model(encoder, decoder, dir: str):
+def load_model(encoder, decoder, dir: str, device):
     output_dir = Path(dir)
-    encoder.load_state_dict(torch.load(output_dir / 'encoder.pkl'))
-    decoder.load_state_dict(torch.load(output_dir / 'decoder.pkl'))
+    encoder.load_state_dict(torch.load(
+        output_dir / 'encoder.pkl', map_location=device))
+    decoder.load_state_dict(torch.load(
+        output_dir / 'decoder.pkl', map_location=device))
 
 
 def get_args():
@@ -67,10 +69,10 @@ def main():
                              padding_idx=word_to_ix['[PAD]'])
     encoder = GRUEncoder(embedding, args.hidden_dim, args.n_layer)
     decoder = AttnGRUDecoder(embedding, args.hidden_dim, vocab, args.n_layer)
-    load_model(encoder, decoder, args.ckpt_dir)
     searcher = GreedySearchDecoder(encoder, decoder, word_to_ix['[SOS]'])
     device = torch.device('cuda' if torch.cuda.is_available()
-                                    and not args.no_cuda else 'cpu')
+                          and not args.no_cuda else 'cpu')
+    load_model(encoder, decoder, args.ckpt_dir, device)
     searcher.eval()
     searcher.to(device)
     evaluate_loop(searcher, word_to_ix, args.max_seq_len, args.en)
